@@ -24,8 +24,8 @@ class Expediente extends Model
     ];
 
     protected $casts = [
-        'fecha_ingreso' => 'date',
-        'fecha_revision' => 'date',
+        'fecha_ingreso' => 'date:Y-m-d',
+        'fecha_revision' => 'date:Y-m-d',
         'digitalizado' => 'boolean',
     ];
 

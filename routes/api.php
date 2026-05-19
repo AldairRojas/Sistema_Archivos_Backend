@@ -7,7 +7,7 @@ use App\Http\Controllers\ExpedienteController;
 //login (Inicio)
 Route::post('/login', [AuthController::class, 'login']);
 
-// Rutas protegidas con autoenticacion
+// Rutas protegidas con autenticacion
 Route::middleware('auth:sanctum')->group(function () {
 
     // Logout
@@ -15,6 +15,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Usuario autenticado
     Route::get('/me', [AuthController::class, 'me']);
+
+    // Listas para formularios
+    Route::get('/areas',           [ExpedienteController::class, 'areas']);
+    Route::get('/tipos-documento', [ExpedienteController::class, 'tiposDocumento']);
 
     // Registrar expediente
     Route::post('/expedientes', [ExpedienteController::class, 'store']);

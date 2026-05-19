@@ -20,7 +20,7 @@ composer install
 
 3. Copiar el archivo de configuración
 copy .env.example .env
-
+    
 4. Generar la clave de la aplicación
 php artisan key:generate
 
