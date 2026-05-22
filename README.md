@@ -1,19 +1,29 @@
 # 📋 Sistema de Gestión de Archivos y Expedientes
 
-Backend API REST en Laravel para gestión de archivos y expedientes documentales.
+Backend API REST en Laravel para gestión de archivos y expedientes documentales municipales.
+
+**Versión:** 1.0  
+**Estado:** ✅ Funcional (Sprints 1-4 completados)  
+**Equipo:** Backend + Frontend
 
 ---
 
 ## 📑 Tabla de Contenidos
 
 1. [Descripción General](#descripción-general)
-2. [Requisitos](#requisitos)
-3. [Instalación](#instalación)
-4. [Autenticación](#autenticación)
-5. [Sprints](#sprints)
-6. [Endpoints](#endpoints)
-7. [Ejemplos](#ejemplos)
-8. [Estructura](#estructura)
+2. [Stack Tecnológico](#stack-tecnológico)
+3. [Requisitos](#requisitos)
+4. [Instalación](#instalación)
+5. [Autenticación](#autenticación)
+6. [Sprints Implementados](#sprints-implementados)
+7. [Endpoints Disponibles](#endpoints-disponibles)
+8. [Modelos de Datos](#modelos-de-datos)
+9. [Validaciones](#validaciones)
+10. [Ejemplos de Uso](#ejemplos-de-uso)
+11. [Códigos HTTP](#códigos-http)
+12. [Estados de Expediente](#estados-de-expediente)
+13. [Estructura](#estructura)
+14. [Solución de Problemas](#solución-de-problemas)
 
 ---
 
@@ -23,15 +33,19 @@ Sistema backend para digitalizar y gestionar expedientes documentales de forma s
 - ✅ Registro y gestión de expedientes
 - ✅ Control de estados (Activo, Archivado, Prestado, etc.)
 - ✅ Subida y digitalización de archivos PDF
-- ✅ Historial completo de cambios
-- ✅ Auditoría de accesos
+- ✅ Historial completo de cambios con auditoría
+- ✅ Búsqueda avanzada con múltiples filtros
+- ✅ Alertas de documentos próximos a revisión
+- ✅ Administración de áreas municipales
+
+**Base de datos:** Expedientes, Usuarios, Áreas, Tipos de documento, Archivos digitales, Historial de cambios
 
 **Stack:**
 - Laravel 12
 - PHP 8.2+
-- SQLite/MySQL
-- Laravel Sanctum (autenticación API)
-- Vite + Tailwind CSS (frontend)
+- MariaDB/MySQL
+- Laravel Sanctum (autenticación con tokens Bearer)
+- Vite + Tailwind CSS
 
 ---
 
@@ -39,9 +53,10 @@ Sistema backend para digitalizar y gestionar expedientes documentales de forma s
 
 - PHP >= 8.2
 - Composer
-- Node.js + npm
+- Node.js + npm (opcional, solo para assets)
 - Laravel 12
-- MySQL o SQLite
+- MariaDB/MySQL
+- Git
 
 ---
 
@@ -65,8 +80,8 @@ php artisan key:generate
 ```
 
 ### 4. Configurar base de datos en .env
-```
-DB_CONNECTION=mysql
+```env
+DB_CONNECTION=mariadb
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=archivos
@@ -79,7 +94,7 @@ DB_PASSWORD=
 php artisan migrate
 ```
 
-### 6. Instalar dependencias JavaScript
+### 6. (Opcional) Instalar dependencias JavaScript
 ```bash
 npm install
 npm run build
@@ -90,23 +105,303 @@ npm run build
 php artisan serve
 ```
 
-El servidor estará disponible en: `http://localhost:8000`
+El servidor estará disponible en: **`http://localhost:8000`**
+
+### 8. Crear usuario de prueba (opcional)
+```bash
+php artisan tinker
+>>> $user = new \App\Models\User();
+>>> $user->nombre = 'Admin';
+>>> $user->email = 'admin@test.com';
+>>> $user->password = Hash::make('password123');
+>>> $user->rol = 'admin';
+>>> $user->activo = 1;
+>>> $user->save();
+```
 
 ---
 
 ## 🔐 Autenticación
 
-Todos los endpoints (excepto `/login`) requieren autenticación con token Bearer.
+Todos los endpoints (excepto `/login`) requieren autenticación con **token Bearer**.
 
 ### Login
-```
+```http
 POST /api/login
 Content-Type: application/json
 
 {
-  "email": "usuario@ejemplo.com",
-  "password": "password123"
+    "email": "archivo@jlo.gob.pe",
+    "password": "password"
 }
+```
+
+**Respuesta exitosa (200):**
+```json
+{
+  "message": "Inicio de sesión exitoso",
+  "token": "1|ABC123XYZ...",
+  "user": {
+    "id": 1,
+    "nombre": "Usuario",
+    "email": "archivo@jlo.gob.pe",
+    "rol": "usuario"
+  }
+}
+```
+
+**Respuesta error (401):**
+```json
+{
+  "message": "Correo o contraseña incorrectos"
+}
+```
+
+### Usar token en peticiones
+Agregar header `Authorization` a todas las peticiones protegidas:
+```http
+Authorization: Bearer 1|ABC123XYZ...
+```
+
+### Logout
+```http
+POST /api/logout
+Authorization: Bearer {token}
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Sesión cerrada correctamente"
+}
+```
+
+### Obtener usuario actual
+```http
+GET /api/me
+Authorization: Bearer {token}
+```
+
+**Respuesta:**
+```json
+{
+  "user": {
+    "id": 1,
+    "nombre": "Usuario",
+    "email": "archivo@jlo.gob.pe",
+    "rol": "usuario"
+  }
+}
+```
+
+---
+
+## ✨ Sprints Implementados
+
+### ✅ Sprint 1 - CRUD de Expedientes (Completo)
+**5 Historias de Usuario implementadas**
+- Autenticación de usuarios (HU01)
+- Cierre de sesión (HU18)
+- Registro de expedientes (HU02)
+- Visualización de expedientes (HU03)
+- Búsqueda de expedientes (HU04)
+
+### ✅ Sprint 2 - Actualización y Gestión de Estados (Completo)
+**3 Historias de Usuario implementadas**
+- Visualización detallada (HU05)
+- Modificación de expedientes (HU06)
+- Cambio de estado (HU07)
+
+### ✅ Sprint 3 - Digitalización de Archivos PDF (Completo)
+**3 Historias de Usuario implementadas**
+- Subida de PDF (HU08)
+- Asociación de archivos (HU09)
+- Visualización de archivos (HU10)
+
+### ✅ Sprint 4 - Administración de Áreas (Completo)
+**3 Historias de Usuario implementadas**
+- Registro de áreas (HU11)
+- Consulta y modificación de áreas (HU12)
+- Seguimiento de expedientes próximos a revisión (HU14)
+
+### ⏳ Sprint 5 - Reportes Estadísticos (Futuro)
+*No implementado en esta versión*
+
+## 📡 Endpoints Disponibles (18 rutas)
+
+### Autenticación (Públicas - sin token)
+```http
+POST   /api/login       → Login (obtener token)
+```
+
+### Autenticación (Protegidas - con token)
+```http
+POST   /api/logout      → Logout (cerrar sesión)
+GET    /api/me          → Obtener usuario actual
+```
+
+### Listas para Formularios (Protegidas)
+```http
+GET    /api/areas               → Listar áreas disponibles
+GET    /api/tipos-documento     → Listar tipos de documento
+```
+
+### Sprint 1 - Expedientes: CRUD
+```http
+POST   /api/expedientes         → Crear expediente
+GET    /api/expedientes         → Listar expedientes
+GET    /api/expedientes/{id}    → Ver detalle de expediente
+GET    /api/expedientes/buscar  → Buscar con filtros avanzados
+```
+
+### Sprint 2 - Expedientes: Actualización y Estados
+```http
+PUT    /api/expedientes/{id}           → Actualizar expediente
+PATCH  /api/expedientes/{id}/estado    → Cambiar estado + auditoría
+```
+
+### Sprint 3 - Archivos Digitales
+```http
+POST   /api/expedientes/{id}/archivos              → Subir PDF
+GET    /api/expedientes/{id}/archivos              → Listar PDFs del expediente
+GET    /api/expedientes/{id}/archivos/{archivo_id} → Descargar PDF
+```
+
+### Sprint 4 - Áreas
+```http
+GET    /api/areas               → Listar áreas
+GET    /api/areas/{id}          → Ver detalle de área
+POST   /api/areas               → Crear área
+PUT    /api/areas/{id}          → Actualizar área
+DELETE /api/areas/{id}          → Desactivar área
+```
+
+### Sprint 4 - Alertas de Revisión
+```http
+GET    /api/expedientes/alertas → Expedientes agrupados por alerta
+```
+
+## 📋 Modelos de Datos
+
+### Expediente
+```json
+{
+  "id": 1,
+  "numero_expediente": "EXP-001",
+  "titulo": "Contrato de servicios",
+  "descripcion": "Contrato de servicios 2026",
+  "tipo_documento": "Contrato",
+  "area_origen": "Administración",
+  "area_actual": "Administración",
+  "numero_folios": 25,
+  "estado": "Activo",
+  "fecha_ingreso": "2026-05-20",
+  "tiempo_conservacion": "5 años",
+  "fecha_revision": "2031-05-20",
+  "digitalizado": false,
+  "created_at": "2026-05-22T10:30:00Z"
+}
+```
+
+### Área
+```json
+{
+  "id": 1,
+  "nombre": "Administración",
+  "descripcion": "Área administrativa central",
+  "activo": 1,
+  "created_at": "2026-05-22T10:00:00Z",
+  "updated_at": "2026-05-22T10:00:00Z"
+}
+```
+
+### Tipo Documento
+```json
+{
+  "id": 1,
+  "nombre": "Contrato",
+  "descripcion": "Contratos varios",
+  "activo": 1,
+  "created_at": "2026-05-22T10:00:00Z"
+}
+```
+
+### Archivo Digital
+```json
+{
+  "id": 1,
+  "expediente_id": 1,
+  "usuario_id": 1,
+  "nombre_original": "documento.pdf",
+  "nombre_archivo": "1726934485_documento.pdf",
+  "ruta_archivo": "expedientes/1/1726934485_documento.pdf",
+  "tipo_mime": "application/pdf",
+  "tamano_bytes": 250000,
+  "uploaded_at": "2026-05-22T08:30:00Z"
+}
+```
+
+### Historial de Estado
+```json
+{
+  "id": 1,
+  "expediente_id": 1,
+  "estado_anterior": "Activo",
+  "estado_nuevo": "Archivado",
+  "usuario_id": 1,
+  "usuario_nombre": "Admin",
+  "fecha_cambio": "2026-05-22T11:30:00Z",
+  "observaciones": "Por inactividad"
+}
+```
+
+---
+
+## ✅ Validaciones
+
+### Crear/Actualizar Expediente
+| Campo | Validación | Ejemplo |
+|-------|-----------|---------|
+| `numero_expediente` | Único, máx 50 caracteres, requerido | `EXP-001` |
+| `titulo` | Requerido, máx 255 caracteres | `Contrato de servicios` |
+| `descripcion` | Requerida, sin límite | `Descripción...` |
+| `tipo_documento_id` | Requerido, debe existir | `1` |
+| `area_origen_id` | Requerido, debe existir | `1` |
+| `area_actual_id` | Requerido, debe existir | `1` |
+| `numero_folios` | Requerido, entero, mínimo 1 | `25` |
+| `estado` | Requerido, valores permitidos | `Activo` |
+| `fecha_ingreso` | Requerida, no mayor a hoy | `2026-05-20` |
+| `tiempo_conservacion` | Requerido, máx 50 caracteres | `5 años` o `Permanente` |
+
+### Cambiar Estado
+| Campo | Validación | Ejemplo |
+|-------|-----------|---------|
+| `estado` | Requerido, solo valores permitidos | `Archivado` |
+| `observaciones` | Opcional, máx 500 caracteres | `Expediente completado` |
+
+### Subir Archivo
+| Campo | Validación | Ejemplo |
+|-------|-----------|---------|
+| `archivo` | Requerido, PDF, máx 50MB | `documento.pdf` |
+
+### Crear/Actualizar Área
+| Campo | Validación | Ejemplo |
+|-------|-----------|---------|
+| `nombre` | Requerido, único, máx 100 caracteres | `Administración` |
+| `descripcion` | Requerida, máx 255 caracteres | `Área administrativa central` |
+
+---
+
+## 💡 Ejemplos de Uso
+
+### Ejemplo 1: Login
+```bash
+curl -X POST http://localhost:8000/api/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "archivo@jlo.gob.pe",
+    "password": "password"
+  }'
 ```
 
 **Respuesta:**
@@ -116,260 +411,17 @@ Content-Type: application/json
   "token": "1|ABC123XYZ...",
   "user": {
     "id": 1,
-    "nombre": "Juan Pérez",
-    "email": "usuario@ejemplo.com",
-    "rol": "admin"
+    "nombre": "Usuario",
+    "email": "archivo@jlo.gob.pe",
+    "rol": "usuario"
   }
 }
 ```
 
-### Usar token en peticiones
-Agregar header a todas las peticiones:
-```
-Authorization: Bearer 1|ABC123XYZ...
-```
-
-### Logout
-```
-POST /api/logout
-Authorization: Bearer {token}
-```
-
-### Obtener usuario actual
-```
-GET /api/me
-Authorization: Bearer {token}
-```
-
----
-
-## 📦 Sprints Implementados
-
-### ✅ Sprint 1 - CRUD de Expedientes
-
-**Objetivo:** Crear, listar y consultar expedientes
-
-#### Funcionalidades (HU01-HU04)
-
-| ID | Título | Descripción |
-|-----|---------|-------------|
-| HU01 | Registro de expedientes | Crear expedientes con validaciones |
-| HU02 | Listado de expedientes | Ver todos los expedientes |
-| HU03 | Consulta de expediente | Ver detalle de un expediente |
-| HU04 | Búsqueda de expedientes | Buscar con filtros |
-
-#### Endpoints Sprint 1
-```
-POST   /api/expedientes              → Crear expediente
-GET    /api/expedientes              → Listar todos
-GET    /api/expedientes/{id}         → Ver detalle
-GET    /api/expedientes/buscar       → Buscar con filtros
-GET    /api/areas                    → Listar áreas disponibles
-GET    /api/tipos-documento          → Listar tipos de documento
-```
-
-#### Campos de expediente
-```json
-{
-  "numero_expediente": "EXP-001",
-  "titulo": "Título del expediente",
-  "descripcion": "Descripción detallada",
-  "tipo_documento_id": 1,
-  "area_origen_id": 1,
-  "area_actual_id": 1,
-  "numero_folios": 50,
-  "estado": "Activo",
-  "fecha_ingreso": "2026-05-20",
-  "tiempo_conservacion": "5 años"
-}
-```
-
----
-
-### ✅ Sprint 2 - Actualización y Gestión de Estados
-
-**Objetivo:** Modificar expedientes y gestionar cambios de estado
-
-#### Funcionalidades (HU05-HU07)
-
-| ID | Título | Descripción |
-|-----|---------|-------------|
-| HU05 | Visualización detallada | Ver expediente con historial de cambios |
-| HU06 | Modificación | Actualizar datos del expediente |
-| HU07 | Cambio de estado | Cambiar estado + registra auditoría |
-
-#### Endpoints Sprint 2
-```
-PUT    /api/expedientes/{id}         → Actualizar expediente
-PATCH  /api/expedientes/{id}/estado  → Cambiar estado
-GET    /api/expedientes/{id}         → Ver + historial completo
-```
-
-#### Estados permitidos
-- `Activo` - Expediente en uso
-- `Archivado` - Expediente archivado
-- `Prestado` - En préstamo a otra área
-- `Pendiente transferencia` - Pendiente de transferencia
-
-#### Cambiar estado de expediente
-```json
-{
-  "estado": "Archivado",
-  "observaciones": "Razón del cambio (opcional)"
-}
-```
-
-#### Respuesta con historial
-```json
-{
-  "message": "Estado actualizado correctamente",
-  "estado_anterior": "Activo",
-  "estado_nuevo": "Archivado"
-}
-```
-
-#### Visualizar historial (GET /expedientes/{id})
-```json
-{
-  "expediente": {...},
-  "historial": [
-    {
-      "id": 1,
-      "estado_anterior": "Activo",
-      "estado_nuevo": "Archivado",
-      "observaciones": "Por inactividad",
-      "fecha_cambio": "2026-05-22T08:00:00Z",
-      "usuario": "Juan Pérez"
-    }
-  ]
-}
-```
-
----
-
-### ✅ Sprint 3 - Digitalización de Archivos PDF
-
-**Objetivo:** Subir, gestionar y descargar archivos PDF asociados a expedientes
-
-#### Funcionalidades (HU08-HU10)
-
-| ID | Título | Descripción |
-|-----|---------|-------------|
-| HU08 | Subida de PDF | Subir archivos validando formato y tamaño |
-| HU09 | Asociación | Vincular PDF con expediente + marcar digitalizado |
-| HU10 | Visualización | Ver y descargar archivos asociados |
-
-#### Endpoints Sprint 3
-```
-POST   /api/expedientes/{id}/archivos              → Subir PDF
-GET    /api/expedientes/{id}/archivos              → Listar archivos
-GET    /api/expedientes/{id}/archivos/{archivo_id} → Descargar archivo
-```
-
-#### Subir archivo PDF
-```
-Content-Type: multipart/form-data
-
-Form data:
-- Key: "archivo"
-- Type: File
-- Value: [selecciona archivo PDF]
-```
-
-#### Validaciones de archivos
-- ✅ Solo PDF (`application/pdf`)
-- ✅ Tamaño máximo: 50MB
-- ✅ Nombre único (timestamp + nombre original)
-- ✅ Almacenamiento seguro en `storage/app/public/`
-
-#### Respuesta subida exitosa (201)
-```json
-{
-  "message": "Archivo subido correctamente",
-  "archivo": {
-    "id": 1,
-    "expediente_id": 1,
-    "nombre_original": "documento.pdf",
-    "nombre_archivo": "1726934485_documento.pdf",
-    "ruta_archivo": "expedientes/1/1726934485_documento.pdf",
-    "tipo_mime": "application/pdf",
-    "tamano_bytes": 250000,
-    "uploaded_at": "2026-05-22T08:30:00Z"
-  }
-}
-```
-
-#### Listar archivos del expediente (200)
-```json
-{
-  "archivos": [
-    {
-      "id": 1,
-      "expediente_id": 1,
-      "nombre_original": "documento.pdf",
-      "nombre_archivo": "1726934485_documento.pdf",
-      "ruta_archivo": "expedientes/1/1726934485_documento.pdf",
-      "tipo_mime": "application/pdf",
-      "tamano_bytes": 250000,
-      "uploaded_at": "2026-05-22T08:30:00Z"
-    }
-  ]
-}
-```
-
-#### Acciones automáticas al subir PDF
-- ✅ Se vincula automáticamente al expediente
-- ✅ Se marca `digitalizado = true` en el expediente
-- ✅ Se genera nombre único con timestamp
-- ✅ Se guarda en disco (privado)
-- ✅ Se registra en auditoría
-
----
-
-## 📡 Endpoints Completos
-
-### Autenticación
-```
-POST   /api/login       → Login (obtener token)
-POST   /api/logout      → Logout (cerrar sesión)
-GET    /api/me          → Obtener usuario actual
-```
-
-### Listados
-```
-GET    /api/areas               → Áreas disponibles
-GET    /api/tipos-documento     → Tipos de documento
-```
-
-### Sprint 1 - Expedientes (CRUD)
-```
-POST   /api/expedientes         → Crear expediente
-GET    /api/expedientes         → Listar expedientes
-GET    /api/expedientes/{id}    → Ver expediente
-GET    /api/expedientes/buscar  → Buscar expedientes
-```
-
-### Sprint 2 - Actualización y Estados
-```
-PUT    /api/expedientes/{id}           → Actualizar expediente
-PATCH  /api/expedientes/{id}/estado    → Cambiar estado
-```
-
-### Sprint 3 - Archivos Digitales
-```
-POST   /api/expedientes/{id}/archivos              → Subir PDF
-GET    /api/expedientes/{id}/archivos              → Listar PDFs
-GET    /api/expedientes/{id}/archivos/{archivo_id} → Descargar PDF
-```
-
----
-
-## 💡 Ejemplos de Uso
-
-### Ejemplo 1: Crear expediente (Sprint 1)
+### Ejemplo 2: Crear Expediente
 ```bash
 curl -X POST http://localhost:8000/api/expedientes \
-  -H "Authorization: Bearer {token}" \
+  -H "Authorization: Bearer 1|ABC123XYZ..." \
   -H "Content-Type: application/json" \
   -d '{
     "numero_expediente": "EXP-001",
@@ -385,10 +437,25 @@ curl -X POST http://localhost:8000/api/expedientes \
   }'
 ```
 
-### Ejemplo 2: Cambiar estado (Sprint 2)
+### Ejemplo 3: Buscar Expedientes
+```bash
+curl -X GET "http://localhost:8000/api/expedientes/buscar?titulo=contrato&estado=Activo&area_actual_id=1" \
+  -H "Authorization: Bearer 1|ABC123XYZ..."
+```
+
+**Parámetros de búsqueda:**
+- `numero_expediente` - búsqueda parcial
+- `titulo` - búsqueda parcial
+- `area_actual_id` - filtro exacto
+- `estado` - filtro exacto
+- `tipo_documento_id` - filtro exacto
+- `fecha_inicio` - fecha de inicio (YYYY-MM-DD)
+- `fecha_fin` - fecha de fin (YYYY-MM-DD)
+
+### Ejemplo 4: Cambiar Estado de Expediente
 ```bash
 curl -X PATCH http://localhost:8000/api/expedientes/1/estado \
-  -H "Authorization: Bearer {token}" \
+  -H "Authorization: Bearer 1|ABC123XYZ..." \
   -H "Content-Type: application/json" \
   -d '{
     "estado": "Archivado",
@@ -396,27 +463,153 @@ curl -X PATCH http://localhost:8000/api/expedientes/1/estado \
   }'
 ```
 
-### Ejemplo 3: Subir PDF (Sprint 3 - con Postman)
+### Ejemplo 5: Subir PDF
+```bash
+curl -X POST http://localhost:8000/api/expedientes/1/archivos \
+  -H "Authorization: Bearer 1|ABC123XYZ..." \
+  -F "archivo=@documento.pdf"
+```
+
+O en **Postman:**
 1. Método: **POST**
 2. URL: `http://localhost:8000/api/expedientes/1/archivos`
-3. Headers: `Authorization: Bearer {token}`
+3. Headers: `Authorization: Bearer 1|ABC123XYZ...`
 4. Body → **form-data**:
    - Key: `archivo`
    - Type: `File`
    - Value: (selecciona archivo PDF)
 5. Click **Send**
 
-### Ejemplo 4: Listar archivos del expediente (Sprint 3)
+### Ejemplo 6: Listar Archivos del Expediente
 ```bash
 curl -X GET http://localhost:8000/api/expedientes/1/archivos \
-  -H "Authorization: Bearer {token}"
+  -H "Authorization: Bearer 1|ABC123XYZ..."
 ```
 
-### Ejemplo 5: Descargar archivo (Sprint 3)
+### Ejemplo 7: Descargar Archivo
 ```bash
 curl -X GET http://localhost:8000/api/expedientes/1/archivos/1 \
-  -H "Authorization: Bearer {token}" \
+  -H "Authorization: Bearer 1|ABC123XYZ..." \
   -o documento.pdf
+```
+
+### Ejemplo 8: Ver Alertas de Revisión
+```bash
+curl -X GET http://localhost:8000/api/expedientes/alertas \
+  -H "Authorization: Bearer 1|ABC123XYZ..."
+```
+
+**Respuesta:**
+```json
+{
+  "VIGENTE": [
+    { "id": 1, "numero_expediente": "EXP-001", ... }
+  ],
+  "PROXIMO": [
+    { "id": 2, "numero_expediente": "EXP-002", ... }
+  ],
+  "ATRASADO": [
+    { "id": 3, "numero_expediente": "EXP-003", ... }
+  ]
+}
+```
+
+### Ejemplo 9: Crear Área
+```bash
+curl -X POST http://localhost:8000/api/areas \
+  -H "Authorization: Bearer 1|ABC123XYZ..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Tesorería",
+    "descripcion": "Área de gestión financiera"
+  }'
+```
+
+### Ejemplo 10: Listar Áreas
+```bash
+curl -X GET http://localhost:8000/api/areas \
+  -H "Authorization: Bearer 1|ABC123XYZ..."
+```
+
+---
+
+## 📊 Estados de Expediente
+
+| Estado | Descripción | Permite cambios |
+|--------|-------------|-----------------|
+| `Activo` | Expediente en uso activo | Sí |
+| `Archivado` | Expediente archivado | Sí |
+| `Prestado` | En préstamo a otra área | Sí |
+| `Pendiente transferencia` | Pendiente de transferencia | Sí |
+
+---
+
+## 🔍 Búsqueda Avanzada
+
+El endpoint `GET /api/expedientes/buscar` acepta múltiples parámetros:
+
+```http
+GET /api/expedientes/buscar?numero=EXP&titulo=contrato&estado=Activo&area_actual_id=1&fecha_inicio=2026-01-01&fecha_fin=2026-12-31
+```
+
+**Respuesta:**
+```json
+{
+  "data": [
+    { "id": 1, "numero_expediente": "EXP-001", ... }
+  ],
+  "current_page": 1,
+  "last_page": 1,
+  "per_page": 10,
+  "total": 1
+}
+```
+
+---
+
+## 🚨 Códigos HTTP
+
+| Código | Significado | Ejemplo |
+|--------|------------|---------|
+| **200** | OK - Operación exitosa | Lectura de datos |
+| **201** | Created - Recurso creado exitosamente | POST de expediente |
+| **400** | Bad Request - Solicitud inválida | Formato incorrecto |
+| **401** | Unauthorized - Sin autenticación/token inválido | Falta token |
+| **404** | Not Found - Recurso no encontrado | ID inexistente |
+| **422** | Unprocessable Entity - Validación fallida | Campos inválidos |
+| **500** | Server Error - Error del servidor | Error interno |
+
+---
+
+## ⚠️ Respuestas de Error
+
+### Error de Validación (422)
+```json
+{
+  "message": "The given data was invalid.",
+  "errors": {
+    "numero_expediente": [
+      "The numero_expediente has already been taken."
+    ],
+    "titulo": [
+      "The titulo field is required."
+    ]
+  }
+}
+```
+
+### Error de No Encontrado (404)
+```json
+{
+  "message": "Expediente no encontrado"
+}
+```
+
+### Error de Autenticación (401)
+```json
+{
+  "message": "Unauthenticated."
+}
 ```
 
 ---
@@ -428,214 +621,95 @@ backendArchivos/
 ├── app/
 │   ├── Http/
 │   │   └── Controllers/
-│   │       ├── AuthController.php           ← Autenticación
-│   │       ├── ExpedienteController.php     ← Sprint 1 y 2
-│   │       └── ArchivoDigitalController.php ← Sprint 3
+│   │       ├── AuthController.php           ✅
+│   │       ├── ExpedienteController.php     ✅
+│   │       ├── ArchivoDigitalController.php ✅
+│   │       ├── AreaController.php           ✅
+│   │       └── Controller.php
+│   │
 │   ├── Models/
-│   │   ├── User.php                         ← Usuarios
-│   │   ├── Expediente.php                   ← Expedientes
-│   │   ├── Area.php                         ← Áreas
-│   │   ├── TipoDocumento.php                ← Tipos documento
-│   │   ├── HistorialEstado.php              ← Historial
-│   │   └── ArchivoDigital.php               ← Archivos
-│   └── Providers/
+│   │   ├── User.php                 ✅
+│   │   ├── Expediente.php           ✅
+│   │   ├── Area.php                 ✅
+│   │   ├── TipoDocumento.php        ✅
+│   │   ├── HistorialEstado.php      ✅
+│   │   └── ArchivoDigital.php       ✅
 │
 ├── database/
 │   ├── migrations/
-│   │   ├── create_usuarios_table.php
-│   │   ├── create_expedientes_table.php
-│   │   ├── create_areas_table.php
-│   │   ├── create_tipos_documento_table.php
-│   │   ├── create_historial_estados_table.php
-│   │   └── create_archivos_digitales_table.php
+│   ├── factories/
 │   └── seeders/
 │
 ├── routes/
-│   ├── api.php          ← Todas las rutas API
-│   └── web.php
+│   ├── api.php          ✅ (18 rutas)
+│   ├── web.php
+│   └── console.php
 │
 ├── storage/
-│   └── app/
-│       └── public/
-│           └── expedientes/  ← Almacenamiento de PDFs
+│   └── app/public/expedientes/  ✅ (Almacenamiento de PDFs)
 │
 ├── config/
-│   ├── app.php
 │   ├── database.php
+│   ├── sanctum.php
 │   ├── filesystems.php
-│   └── cors.php
+│   └── documentos.php
 │
+├── .env
 ├── .env.example
 ├── composer.json
-├── package.json
-└── README.md
+├── README.md (este archivo)
+└── vite.config.js
 ```
-
----
-
-## 🗄️ Modelos y Relaciones
-
-### User (Usuarios)
-```php
-- hasMany(HistorialEstado)
-- hasMany(ArchivoDigital)
-```
-
-### Expediente (Expedientes)
-```php
-- belongsTo(TipoDocumento)
-- belongsTo(Area) as areaOrigen
-- belongsTo(Area) as areaActual
-- hasMany(HistorialEstado)
-- hasMany(ArchivoDigital)
-```
-
-### ArchivoDigital (Archivos)
-```php
-- belongsTo(Expediente)
-- belongsTo(User) as usuario
-```
-
-### HistorialEstado (Historial)
-```php
-- belongsTo(Expediente)
-- belongsTo(User)
-```
-
-### Area (Áreas)
-```php
-- hasMany(Expediente) as areaOrigen
-- hasMany(Expediente) as areaActual
-```
-
-### TipoDocumento (Tipos)
-```php
-- hasMany(Expediente)
-```
-
----
-
-## ✅ Validaciones
-
-### Crear/Actualizar Expediente
-- `numero_expediente` - único, máx 50 caracteres, requerido
-- `titulo` - requerido, máx 255 caracteres
-- `descripcion` - requerida, máx 5000 caracteres
-- `tipo_documento_id` - requerido, debe existir
-- `area_origen_id` - requerido, debe existir
-- `area_actual_id` - requerido, debe existir
-- `numero_folios` - requerido, entero, mínimo 1
-- `estado` - solo: Activo, Archivado, Prestado, Pendiente transferencia
-- `fecha_ingreso` - requerida, formato date, no mayor a hoy
-- `tiempo_conservacion` - requerido, máx 50 caracteres
-
-### Cambiar Estado
-- `estado` - requerido, solo valores permitidos
-- `observaciones` - opcional, máx 500 caracteres
-
-### Subir Archivo
-- `archivo` - requerido, PDF, máx 50MB
-- Solo formato PDF (application/pdf) permitido
-
----
-
-## 🔍 Búsqueda de Expedientes
-
-El endpoint `GET /api/expedientes/buscar` acepta parámetros query:
-
-```
-GET /api/expedientes/buscar?numero=EXP&titulo=contrato&estado=Activo
-```
-
-Parámetros disponibles:
-- `numero` - Búsqueda en número de expediente
-- `titulo` - Búsqueda en título
-- `estado` - Filtrar por estado
-- `area` - Filtrar por área actual
-- `desde` - Fecha inicio (fecha_ingreso)
-- `hasta` - Fecha fin (fecha_ingreso)
-
----
-
-## 📊 Estados de Expediente
-
-| Estado | Descripción | Permite cambios |
-|--------|-------------|-----------------|
-| Activo | Expediente en uso activo | Sí |
-| Archivado | Expediente archivado | Sí |
-| Prestado | En préstamo a otra área | Sí |
-| Pendiente transferencia | Pendiente de transferencia | Sí |
 
 ---
 
 ## 🛡️ Seguridad
 
-- ✅ Autenticación con Laravel Sanctum (tokens)
-- ✅ Validación de input en backend
-- ✅ Nombres únicos para archivos (previene sobrescritura)
-- ✅ Almacenamiento privado de PDFs
-- ✅ Control de acceso por usuario autenticado
-- ✅ Historial completo de cambios (auditoría)
-- ✅ Encriptación de contraseñas (bcrypt)
+- ✅ **Autenticación:** Laravel Sanctum con tokens Bearer
+- ✅ **Validación de input:** Validaciones robustas en backend
+- ✅ **Nombres únicos para archivos:** Previene sobrescrituras
+- ✅ **Almacenamiento privado:** PDFs guardados fuera de web
+- ✅ **Control de acceso:** Por usuario autenticado
+- ✅ **Historial completo:** Auditoría de todos los cambios
+- ✅ **Encriptación:** Contraseñas con bcrypt
+- ✅ **CORS:** Configurado para frontend
 
 ---
 
-## 📝 Códigos HTTP
+## 🐛 Solución de Problemas
 
-| Código | Significado |
-|--------|------------|
-| 200 | OK - Operación exitosa |
-| 201 | Created - Recurso creado exitosamente |
-| 400 | Bad Request - Solicitud inválida |
-| 401 | Unauthorized - Sin autenticación/token inválido |
-| 404 | Not Found - Recurso no encontrado |
-| 422 | Unprocessable Entity - Validación fallida |
-| 500 | Server Error - Error del servidor |
+### "Unauthenticated" en peticiones
+- ✅ Asegúrate de enviar el header `Authorization: Bearer {token}`
+- ✅ Verifica que el token no esté expirado
+- ✅ Comprueba que el usuario tenga `activo = 1`
 
----
+### "The given data was invalid"
+- ✅ Revisa los errores devueltos en el campo `errors`
+- ✅ Valida los tipos de datos (número_expediente es único)
+- ✅ Asegúrate que los IDs de relaciones existan
 
-## 📈 Resumen de Sprints
+### Error al subir PDF
+- ✅ Verifica que sea un archivo PDF válido
+- ✅ Confirma que sea menor a 50MB
+- ✅ Asegúrate usar `Content-Type: multipart/form-data`
 
-```
-✅ Sprint 1 (Completo): CRUD de expedientes
-   - Crear, listar, consultar y buscar expedientes
-
-✅ Sprint 2 (Completo): Actualización y estados
-   - Modificar expedientes
-   - Cambiar estado con historial
-   - Ver historial de cambios
-
-✅ Sprint 3 (Completo): Digitalización
-   - Subir archivos PDF
-   - Listar archivos por expediente
-   - Descargar archivos
-   - Marcar expediente como digitalizado
-```
-
----
-
-## 🚀 Próximas Fases (No Implementadas)
-
-### Sprint 4 (Futuro)
-- [ ] Búsqueda avanzada con filtros
-- [ ] Reportes y estadísticas
-- [ ] Exportación de datos
-
-### Sprint 5 (Futuro)
-- [ ] Búsqueda rápida mejorada
-- [ ] OCR de documentos
-- [ ] Clasificación automática
-
----
+### Expediente no encontrado (404)
+- ✅ Verifica que el ID del expediente sea correcto
+- ✅ Comprueba que no haya sido eliminado
 
 
-## 📄 Licencia
 
-MIT License - 2026
+## 📈 Próximos Pasos
+
+### Sprint 5 (En desarrollo)
+- [ ] Panel de control con estadísticas
+- [ ] Reportes por área
+- [ ] Reportes de digitalización
+- [ ] Reportes por rango de fechas
 
 ---
 
 **Versión:** 1.0  
 **Última actualización:** 22-05-2026  
-**Equipo:** Desarrollo Backend  
-**Estado:** ✅ Funcional (Sprint 1, 2, 3 completados)
+**Estado:** ✅ Funcional y listo para producción (Sprints 1-4)
+

@@ -6,7 +6,9 @@ use Illuminate\Http\Request;
 use App\Models\Expediente;
 use App\Models\Area;
 use App\Models\TipoDocumento;
+use App\Models\HistorialEstado;
 use Carbon\Carbon;
+
 
 class ExpedienteController extends Controller
 {
@@ -24,10 +26,7 @@ class ExpedienteController extends Controller
             'numero_folios'       => $expediente->numero_folios,
             'estado'              => $expediente->estado,
             'fecha_ingreso'       => optional($expediente->fecha_ingreso)->format('Y-m-d'),
-
             'tiempo_conservacion' => $expediente->tiempo_conservacion,
-
-            // 🔥 AQUÍ LA CLAVE: mostrar PERMANENTE bonito
             'fecha_revision' => $expediente->fecha_revision
                 ? $expediente->fecha_revision->format('Y-m-d')
                 : 'PERMANENTE',
@@ -56,31 +55,31 @@ class ExpedienteController extends Controller
         ]);
 
         $data = $request->all();
-
         $data['fecha_revision'] = null;
+
+        $tiempo = strtolower(trim($data['tiempo_conservacion']));
 
         // ─────────────────────────────────────────────
         // 🔥 CASO 1: PERMANENTE
         // ─────────────────────────────────────────────
-        if (strtolower($data['tiempo_conservacion']) === 'permanente') {
+        if ($tiempo === 'permanente') {
             $data['fecha_revision'] = null;
         }
-
         // ─────────────────────────────────────────────
-        // 🔥 CASO 2: TEMPORAL (meses o años)
+        // 🔥 CASO 2: TEMPORAL (Parchado para React)
         // ─────────────────────────────────────────────
         else {
-            preg_match('/(\d+)\s*(año|años|mes|meses)/i', $data['tiempo_conservacion'], $matches);
+            $fecha = Carbon::parse($data['fecha_ingreso']);
 
-            if (!empty($matches[1]) && !empty($matches[2])) {
-
-                $cantidad = (int) $matches[1];
-                $unidad   = strtolower($matches[2]);
-                $fecha    = Carbon::parse($data['fecha_ingreso']);
-
-                $data['fecha_revision'] = str_starts_with($unidad, 'mes')
-                    ? $fecha->addMonths($cantidad)->toDateString()
-                    : $fecha->addYears($cantidad)->toDateString();
+            // Si es "0.5", sabemos que representa los 6 meses de React
+            if ($tiempo === '0.5') {
+                $data['fecha_revision'] = $fecha->addMonths(6)->toDateString();
+            } else {
+                // Si viene un número entero (ej: "1", "5", "10") de años
+                $años = (int) $tiempo;
+                if ($años > 0) {
+                    $data['fecha_revision'] = $fecha->addYears($años)->toDateString();
+                }
             }
         }
 
@@ -113,6 +112,97 @@ class ExpedienteController extends Controller
         }
 
         return response()->json($this->formatExpediente($expediente), 200);
+    }
+
+     // ─── Update (HU06) ────────────────────────────────────────
+    public function update(Request $request, $id)
+    {
+        $expediente = Expediente::find($id);
+
+        if (!$expediente) {
+            return response()->json([
+                'message' => 'Expediente no encontrado'
+            ], 404);
+        }
+
+        $request->validate([
+            // numero_expediente es fijo, no se puede cambiar
+            // si en el futuro se necesita cambiar, descomentar:
+            'numero_expediente'   => 'required|string|max:50|unique:expedientes,numero_expediente,' . $id,
+            'titulo'              => 'required|string|max:255',
+            'descripcion'         => 'required|string',
+            'tipo_documento_id'   => 'required|exists:tipos_documento,id',
+            'area_origen_id'      => 'required|exists:areas,id',
+            'area_actual_id'      => 'required|exists:areas,id',
+            'numero_folios'       => 'required|integer|min:1',
+            'fecha_ingreso'       => 'required|date|before_or_equal:today',
+            'tiempo_conservacion' => 'required|string|max:50',
+        ]);
+
+        $data = $request->except( 'estado');
+
+        // ── Recalcular fecha_revision si cambia tiempo_conservacion ──
+        preg_match('/(\d+)\s*(año|años|mes|meses)/i', $data['tiempo_conservacion'], $matches);
+
+        if (!empty($matches[1]) && !empty($matches[2])) {
+            $cantidad = (int) $matches[1];
+            $unidad   = strtolower($matches[2]);
+            $fecha    = Carbon::parse($data['fecha_ingreso']);
+
+            $data['fecha_revision'] = str_starts_with($unidad, 'mes')
+                ? $fecha->addMonths($cantidad)->toDateString()
+                : $fecha->addYears($cantidad)->toDateString();
+        }
+
+        $expediente->update($data);
+        $expediente->load(['tipoDocumento', 'areaOrigen', 'areaActual']);
+
+        return response()->json([
+            'message'    => 'Expediente actualizado correctamente',
+            'expediente' => $this->formatExpediente($expediente),
+        ], 200);
+    }
+
+    // ─── Cambiar estado (HU07) ────────────────────────────────
+    public function cambiarEstado(Request $request, $id)
+    {
+        $expediente = Expediente::find($id);
+
+        if (!$expediente) {
+            return response()->json([
+                'message' => 'Expediente no encontrado'
+            ], 404);
+        }
+
+        $request->validate([
+            'estado'        => 'required|in:Activo,Archivado,Prestado,Pendiente transferencia',
+            'observaciones' => 'nullable|string|max:500',
+        ]);
+
+        if ($expediente->estado === $request->estado) {
+            return response()->json([
+                'message' => 'El expediente ya tiene ese estado'
+            ], 422);
+        }
+
+        $estadoAnterior = $expediente->estado;
+
+        $expediente->update(['estado' => $request->estado]);
+
+        HistorialEstado::create([
+            'expediente_id'   => $expediente->id,
+            'estado_anterior' => $estadoAnterior,
+            'estado_nuevo'    => $request->estado,
+            'usuario_id'      => $request->user()->id,
+            'fecha_cambio'    => now(),
+            'observaciones'   => $request->observaciones,
+        ]);
+
+        return response()->json([
+            'message'   => 'Estado actualizado correctamente',
+            'estado_anterior' => $estadoAnterior,
+            'estado_nuevo'    => $request->estado,
+        ], 200);
     }
 
     // ─── Search ───────────────────────────────────────────────

@@ -77,7 +77,7 @@ class Expediente extends Model
             return false; // permanente
         }
 
-        $diasRestantes = Carbon::parse($this->fecha_revision)->diffInDays(Carbon::today(), false);
+        $diasRestantes = Carbon::today()->diffInDays(Carbon::parse($this->fecha_revision), false);
         return $diasRestantes >= 0 && $diasRestantes <= $umbralDias;
     }
 
@@ -90,7 +90,7 @@ class Expediente extends Model
             return 'VIGENTE';
         }
 
-        $diasRestantes = Carbon::parse($this->fecha_revision)->diffInDays(Carbon::today(), false);
+        $diasRestantes = Carbon::today()->diffInDays(Carbon::parse($this->fecha_revision), false);
 
         if ($diasRestantes < 0) {
             return 'ATRASADO';
