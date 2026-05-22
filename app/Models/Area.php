@@ -13,4 +13,14 @@ class Area extends Model
         'descripcion',
         'activo',
     ];
+
+    public function expedientesOrigen()
+    {
+        return $this->hasMany(Expediente::class, 'area_origen_id');
+    }
+
+    public function expedientesActual()
+    {
+        return $this->hasMany(Expediente::class, 'area_actual_id');
+    }
 }

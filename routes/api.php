@@ -3,29 +3,45 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ExpedienteController;
+use App\Http\Controllers\ArchivoDigitalController;
+use App\Http\Controllers\AreaController;
 
-//login (Inicio)
+// ============================================
+// RUTAS PÚBLICAS (sin autenticación)
+// ============================================
 Route::post('/login', [AuthController::class, 'login']);
 
-// Rutas protegidas con autoenticacion
+// ============================================
+// RUTAS PROTEGIDAS (con autenticación)
+// ============================================
 Route::middleware('auth:sanctum')->group(function () {
 
-    // Logout
+    // ── Autenticación ──────────────────────
     Route::post('/logout', [AuthController::class, 'logout']);
-
-    // Usuario autenticado
     Route::get('/me', [AuthController::class, 'me']);
 
-    // Registrar expediente
+    // ── Listas para formularios ────────────
+    Route::get('/areas', [ExpedienteController::class, 'areas']);
+    Route::get('/tipos-documento', [ExpedienteController::class, 'tiposDocumento']);
+
+    // ── Sprint 1 ───────────────────────────
     Route::post('/expedientes', [ExpedienteController::class, 'store']);
-
-    // Buscar expedientes con filtros (debe ir antes que /{id})
     Route::get('/expedientes/buscar', [ExpedienteController::class, 'search']);
-
-    // Listar expedientes
     Route::get('/expedientes', [ExpedienteController::class, 'index']);
-
-    // Ver detalle de expediente
     Route::get('/expedientes/{id}', [ExpedienteController::class, 'show']);
+
+    // ── Sprint 2 ───────────────────────────
+    Route::put('/expedientes/{id}', [ExpedienteController::class, 'update']);
+    Route::patch('/expedientes/{id}/estado', [ExpedienteController::class, 'cambiarEstado']);
+
+    // ── Sprint 3 ───────────────────────────
+    Route::post('/expedientes/{id}/archivos', [ArchivoDigitalController::class, 'subir']);
+    Route::get('/expedientes/{id}/archivos', [ArchivoDigitalController::class, 'listar']);
+    Route::get('/expedientes/{id}/archivos/{archivo_id}', [ArchivoDigitalController::class, 'descargar']);
+
+    // ── Sprint 4 ───────────────────────────
+    Route::post('/areas', [AreaController::class, 'store']);
+    Route::put('/areas/{id}', [AreaController::class, 'update']);
+    Route::get('/expedientes/alertas', [ExpedienteController::class, 'alertas']);
 
 });
