@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ExpedienteController;
 use App\Http\Controllers\ArchivoDigitalController;
 use App\Http\Controllers\AreaController;
+use App\Http\Controllers\ReporteController;
 
 // ============================================
 // RUTAS PÚBLICAS (sin autenticación)
@@ -32,6 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Sprint 2 ───────────────────────────────
     Route::put('/expedientes/{id}', [ExpedienteController::class, 'update']);
+    Route::get('/expedientes/{id}/historial', [ExpedienteController::class, 'historial']);
     Route::patch('/expedientes/{id}/estado', [ExpedienteController::class, 'cambiarEstado']);
 
     // ── Sprint 3 ───────────────────────────────
@@ -45,5 +47,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/areas', [AreaController::class, 'store']);
     Route::put('/areas/{id}', [AreaController::class, 'update']);
     Route::delete('/areas/{id}', [AreaController::class, 'destroy']);
+
+    // ── Sprint 5 — Reportes ────────────────────
+    Route::get('/dashboard/stats', [ReporteController::class, 'stats']);
+    Route::get('/reportes/por-area', [ReporteController::class, 'porArea']);
+    Route::get('/reportes/digitalizacion', [ReporteController::class, 'digitalizacion']);
+    Route::get('/reportes/por-fecha', [ReporteController::class, 'porFecha']);
 
 });

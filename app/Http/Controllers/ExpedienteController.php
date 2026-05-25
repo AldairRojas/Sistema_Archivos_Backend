@@ -7,6 +7,7 @@ use App\Models\Expediente;
 use App\Models\Area;
 use App\Models\TipoDocumento;
 use App\Models\HistorialEstado;
+use App\Models\HistorialEdicion;
 use Carbon\Carbon;
 
 
@@ -47,7 +48,7 @@ class ExpedienteController extends Controller
             'area_origen_id'      => 'required|exists:areas,id',
             'area_actual_id'      => 'required|exists:areas,id',
             'numero_folios'       => 'required|integer|min:1',
-            'estado'              => 'required|in:Activo,Archivado,Prestado,Pendiente transferencia',
+            'estado'              => 'required|in:Activo,Para revision',
             'fecha_ingreso'       => 'required|date|before_or_equal:today',
 
             // puede ser "Permanente" o texto tipo "5 años"
@@ -154,6 +155,22 @@ class ExpedienteController extends Controller
                 : $fecha->addYears($cantidad)->toDateString();
         }
 
+        // Registrar cambios en historial_ediciones
+        foreach ($data as $campo => $valor_nuevo) {
+            $valor_anterior = $expediente->{$campo} ?? null;
+            
+            if ($valor_anterior != $valor_nuevo) {
+                HistorialEdicion::create([
+                    'expediente_id'   => $expediente->id,
+                    'campo_modificado' => $campo,
+                    'valor_anterior'  => $valor_anterior,
+                    'valor_nuevo'     => $valor_nuevo,
+                    'usuario_id'      => $request->user()->id ?? null,
+                    'fecha_cambio'    => now(),
+                ]);
+            }
+        }
+
         $expediente->update($data);
         $expediente->load(['tipoDocumento', 'areaOrigen', 'areaActual']);
 
@@ -175,7 +192,7 @@ class ExpedienteController extends Controller
         }
 
         $request->validate([
-            'estado'        => 'required|in:Activo,Archivado,Prestado,Pendiente transferencia',
+            'estado' => 'required|in:Activo,Para revision',
             'observaciones' => 'nullable|string|max:500',
         ]);
 
@@ -270,6 +287,34 @@ class ExpedienteController extends Controller
             TipoDocumento::orderBy('nombre')->get(['id', 'nombre']),
             200
         );
+    }
+
+    // ─── Historial de ediciones ───────────────────────
+    public function historial($id)
+    {
+        $expediente = Expediente::find($id);
+
+        if (!$expediente) {
+            return response()->json([
+                'message' => 'Expediente no encontrado'
+            ], 404);
+        }
+
+        $historialesEdiciones = HistorialEdicion::where('expediente_id', $id)
+            ->with(['usuario'])
+            ->orderBy('fecha_cambio', 'desc')
+            ->get();
+
+        if ($historialesEdiciones->isEmpty()) {
+            return response()->json([
+                'message' => 'No hay cambios registrados para este expediente',
+                'historialesEdiciones' => [],
+            ], 200);
+        }
+
+        return response()->json([
+            'historialesEdiciones' => $historialesEdiciones,
+        ], 200);
     }
 
     /**

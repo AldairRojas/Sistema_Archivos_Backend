@@ -26,7 +26,7 @@ class ArchivoDigitalController extends Controller
         // Crear registro
         $archivoDigital = ArchivoDigital::create([
         'expediente_id' => $expediente->id,
-        'usuario_id' => auth()->id(),
+        'usuario_id' => $request->user()->id,
 
         'nombre_original' => $archivo->getClientOriginalName(),
         'nombre_archivo' => $nombre_archivo,
