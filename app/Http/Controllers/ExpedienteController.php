@@ -14,31 +14,50 @@ use Carbon\Carbon;
 class ExpedienteController extends Controller
 {
     // ─── Helper ───────────────────────────────────────────────
-    private function formatExpediente($expediente): array
+     private function formatExpediente($expediente): array
     {
         return [
             'id'                  => $expediente->id,
             'numero_expediente'   => $expediente->numero_expediente,
             'titulo'              => $expediente->titulo,
             'descripcion'         => $expediente->descripcion,
-            'tipo_documento'      => $expediente->tipoDocumento?->nombre,
-            'area_origen'         => $expediente->areaOrigen?->nombre,
-            'area_actual'         => $expediente->areaActual?->nombre,
+            'tipo_documento_id'   => $expediente->tipo_documento_id,
+            'tipo_documento'      => $expediente->tipoDocumento?->nombre ?? 'GENERAL / ADMINISTRATIVO',
+            'area_origen_id'      => $expediente->area_origen_id,
+            'area_origen'         => $expediente->areaOrigen?->nombre ?? 'ÁREA MUNICIPAL JLO',  
+            'area_actual_id'      => $expediente->area_actual_id,
+            'area_actual'         => $expediente->areaActual?->nombre ?? 'ARCHIVO CENTRAL',
             'numero_folios'       => $expediente->numero_folios,
             'estado'              => $expediente->estado,
             'fecha_ingreso'       => optional($expediente->fecha_ingreso)->format('Y-m-d'),
             'tiempo_conservacion' => $expediente->tiempo_conservacion,
-            'fecha_revision' => $expediente->fecha_revision
+            'fecha_revision'      => $expediente->fecha_revision
                 ? $expediente->fecha_revision->format('Y-m-d')
                 : 'PERMANENTE',
-
             'digitalizado'        => $expediente->digitalizado,
-            'created_at'          => $expediente->created_at,
+            'created_at'          => optional($expediente->created_at)->format('Y-m-d H:i:s'),
+            'updated_at'          => optional($expediente->updated_at)->format('Y-m-d H:i:s'),
         ];
     }
 
+    // ─── Helper: calcular estado según fecha_revision ─────────
+    private function calcularEstado(?string $fechaRevision): string
+    {
+        if (!$fechaRevision) {
+            return 'Activo'; // Permanente
+        }
+
+        $diasRestantes = Carbon::today()->diffInDays(Carbon::parse($fechaRevision), false);
+
+        if ($diasRestantes <= 30) {
+            return 'Para revision'; // PROXIMO o ATRASADO
+        }
+
+        return 'Activo'; // VIGENTE
+    }
+
     // ─── Store ────────────────────────────────────────────────
-    public function store(Request $request)
+ public function store(Request $request)
     {
         $request->validate([
             'numero_expediente'   => 'required|string|max:50|unique:expedientes,numero_expediente',
@@ -48,10 +67,7 @@ class ExpedienteController extends Controller
             'area_origen_id'      => 'required|exists:areas,id',
             'area_actual_id'      => 'required|exists:areas,id',
             'numero_folios'       => 'required|integer|min:1',
-            'estado'              => 'required|in:Activo,Para revision',
             'fecha_ingreso'       => 'required|date|before_or_equal:today',
-
-            // puede ser "Permanente" o texto tipo "5 años"
             'tiempo_conservacion' => 'required|string|max:50',
         ]);
 
@@ -60,23 +76,14 @@ class ExpedienteController extends Controller
 
         $tiempo = strtolower(trim($data['tiempo_conservacion']));
 
-        // ─────────────────────────────────────────────
-        // 🔥 CASO 1: PERMANENTE
-        // ─────────────────────────────────────────────
         if ($tiempo === 'permanente') {
             $data['fecha_revision'] = null;
-        }
-        // ─────────────────────────────────────────────
-        // 🔥 CASO 2: TEMPORAL (Parchado para React)
-        // ─────────────────────────────────────────────
-        else {
+        } else {
             $fecha = Carbon::parse($data['fecha_ingreso']);
 
-            // Si es "0.5", sabemos que representa los 6 meses de React
             if ($tiempo === '0.5') {
                 $data['fecha_revision'] = $fecha->addMonths(6)->toDateString();
             } else {
-                // Si viene un número entero (ej: "1", "5", "10") de años
                 $años = (int) $tiempo;
                 if ($años > 0) {
                     $data['fecha_revision'] = $fecha->addYears($años)->toDateString();
@@ -84,7 +91,11 @@ class ExpedienteController extends Controller
             }
         }
 
+        $data['estado'] = $this->calcularEstado($data['fecha_revision']);
+
         $expediente = Expediente::create($data);
+        
+        // Forzamos la carga de relaciones para que formatExpediente no retorne nulos
         $expediente->load(['tipoDocumento', 'areaOrigen', 'areaActual']);
 
         return response()->json([
@@ -96,39 +107,34 @@ class ExpedienteController extends Controller
     // ─── Index ────────────────────────────────────────────────
     public function index()
     {
-        $expedientes = Expediente::with(['areaActual', 'tipoDocumento'])->get();
+        $expedientes = Expediente::with(['areaActual', 'tipoDocumento', 'areaOrigen'])
+                                ->orderBy('updated_at', 'desc')
+                                ->get();
         return response()->json($expedientes);
     }
 
     // ─── Show ─────────────────────────────────────────────────
     public function show($id)
     {
-        $expediente = Expediente::with(['tipoDocumento', 'areaOrigen', 'areaActual'])
-            ->find($id);
+        $expediente = Expediente::with(['tipoDocumento', 'areaOrigen', 'areaActual'])->find($id);
 
         if (!$expediente) {
-            return response()->json([
-                'message' => 'Expediente no encontrado'
-            ], 404);
+            return response()->json(['message' => 'Expediente no encontrado'], 404);
         }
 
         return response()->json($this->formatExpediente($expediente), 200);
     }
 
-     // ─── Update (HU06) ────────────────────────────────────────
+    // ─── Update ───────────────────────────────────────────────
     public function update(Request $request, $id)
     {
         $expediente = Expediente::find($id);
 
         if (!$expediente) {
-            return response()->json([
-                'message' => 'Expediente no encontrado'
-            ], 404);
+            return response()->json(['message' => 'Expediente no encontrado'], 404);
         }
 
         $request->validate([
-            // numero_expediente es fijo, no se puede cambiar
-            // si en el futuro se necesita cambiar, descomentar:
             'numero_expediente'   => 'required|string|max:50|unique:expedientes,numero_expediente,' . $id,
             'titulo'              => 'required|string|max:255',
             'descripcion'         => 'required|string',
@@ -140,85 +146,69 @@ class ExpedienteController extends Controller
             'tiempo_conservacion' => 'required|string|max:50',
         ]);
 
-        $data = $request->except( 'estado');
+        $data = $request->except('estado');
 
-        // ── Recalcular fecha_revision si cambia tiempo_conservacion ──
-        preg_match('/(\d+)\s*(año|años|mes|meses)/i', $data['tiempo_conservacion'], $matches);
+        // Recalcular fecha_revision si cambió fecha_ingreso o tiempo_conservacion
+        $fechaIngresoAnterior = $expediente->fecha_ingreso ? $expediente->fecha_ingreso->format('Y-m-d') : null;
+        $cambioFechaIngreso = $data['fecha_ingreso'] !== $fechaIngresoAnterior;
+        $cambioTiempoConservacion = $data['tiempo_conservacion'] !== $expediente->tiempo_conservacion;
 
-        if (!empty($matches[1]) && !empty($matches[2])) {
-            $cantidad = (int) $matches[1];
-            $unidad   = strtolower($matches[2]);
-            $fecha    = Carbon::parse($data['fecha_ingreso']);
+        if ($cambioFechaIngreso || $cambioTiempoConservacion) {
+            $tiempo = strtolower(trim($data['tiempo_conservacion']));
 
-            $data['fecha_revision'] = str_starts_with($unidad, 'mes')
-                ? $fecha->addMonths($cantidad)->toDateString()
-                : $fecha->addYears($cantidad)->toDateString();
+            if ($tiempo === 'permanente') {
+                $data['fecha_revision'] = null;
+            } else {
+                $fecha = Carbon::parse($data['fecha_ingreso']);
+
+                if ($tiempo === '0.5') {
+                    $data['fecha_revision'] = $fecha->addMonths(6)->toDateString();
+                } else {
+                    $años = (int) $tiempo;
+                    if ($años > 0) {
+                        $data['fecha_revision'] = $fecha->addYears($años)->toDateString();
+                    }
+                }
+            }
         }
 
-        // Registrar cambios en historial_ediciones
+        $fechaRevisionFinal = $data['fecha_revision'] ?? ($expediente->fecha_revision?->format('Y-m-d'));
+        $data['estado'] = $this->calcularEstado($fechaRevisionFinal);
+
+        // Registrar cambios en historial_ediciones con formateo estricto
         foreach ($data as $campo => $valor_nuevo) {
+            if (in_array($campo, ['estado', 'fecha_revision'])) {
+                continue;
+            }
+
             $valor_anterior = $expediente->{$campo} ?? null;
-            
-            if ($valor_anterior != $valor_nuevo) {
+
+            if ($valor_anterior instanceof \Carbon\Carbon) {
+                $valor_anterior = $valor_anterior->format('Y-m-d');
+            }
+
+            $valor_anterior_str = (string) $valor_anterior;
+            $valor_nuevo_str = (string) $valor_nuevo;
+
+            if ($valor_anterior_str !== $valor_nuevo_str) {
                 HistorialEdicion::create([
-                    'expediente_id'   => $expediente->id,
+                    'expediente_id'    => $expediente->id,
                     'campo_modificado' => $campo,
-                    'valor_anterior'  => $valor_anterior,
-                    'valor_nuevo'     => $valor_nuevo,
-                    'usuario_id'      => $request->user()->id ?? null,
-                    'fecha_cambio'    => now(),
+                    'valor_anterior'   => $valor_anterior_str,
+                    'valor_nuevo'      => $valor_nuevo_str,
+                    'usuario_id'       => $request->user()->id ?? null,
+                    'fecha_cambio'     => Carbon::now('America/Lima'),
                 ]);
             }
         }
 
         $expediente->update($data);
+        $expediente->refresh();
         $expediente->load(['tipoDocumento', 'areaOrigen', 'areaActual']);
 
         return response()->json([
             'message'    => 'Expediente actualizado correctamente',
             'expediente' => $this->formatExpediente($expediente),
-        ], 200);
-    }
-
-    // ─── Cambiar estado (HU07) ────────────────────────────────
-    public function cambiarEstado(Request $request, $id)
-    {
-        $expediente = Expediente::find($id);
-
-        if (!$expediente) {
-            return response()->json([
-                'message' => 'Expediente no encontrado'
-            ], 404);
-        }
-
-        $request->validate([
-            'estado' => 'required|in:Activo,Para revision',
-            'observaciones' => 'nullable|string|max:500',
-        ]);
-
-        if ($expediente->estado === $request->estado) {
-            return response()->json([
-                'message' => 'El expediente ya tiene ese estado'
-            ], 422);
-        }
-
-        $estadoAnterior = $expediente->estado;
-
-        $expediente->update(['estado' => $request->estado]);
-
-        HistorialEstado::create([
-            'expediente_id'   => $expediente->id,
-            'estado_anterior' => $estadoAnterior,
-            'estado_nuevo'    => $request->estado,
-            'usuario_id'      => $request->user()->id,
-            'fecha_cambio'    => now(),
-            'observaciones'   => $request->observaciones,
-        ]);
-
-        return response()->json([
-            'message'   => 'Estado actualizado correctamente',
-            'estado_anterior' => $estadoAnterior,
-            'estado_nuevo'    => $request->estado,
         ], 200);
     }
 
@@ -230,37 +220,26 @@ class ExpedienteController extends Controller
         if ($request->numero_expediente) {
             $query->where('numero_expediente', 'like', '%' . $request->numero_expediente . '%');
         }
-
         if ($request->titulo) {
             $query->where('titulo', 'like', '%' . $request->titulo . '%');
         }
-
         if ($request->area_actual_id) {
             $query->where('area_actual_id', $request->area_actual_id);
         }
-
         if ($request->estado) {
             $query->where('estado', $request->estado);
         }
-
         if ($request->tipo_documento_id) {
             $query->where('tipo_documento_id', $request->tipo_documento_id);
         }
-
         if ($request->fecha_inicio && $request->fecha_fin) {
-            $query->whereBetween('fecha_ingreso', [
-                $request->fecha_inicio,
-                $request->fecha_fin
-            ]);
+            $query->whereBetween('fecha_ingreso', [$request->fecha_inicio, $request->fecha_fin]);
         }
 
-        $expedientes = $query->orderBy('created_at', 'desc')->paginate(10);
+        $expedientes = $query->orderBy('updated_at', 'desc')->paginate(10);
 
         if ($expedientes->isEmpty()) {
-            return response()->json([
-                'message'     => 'No se encontraron expedientes con los filtros aplicados',
-                'expedientes' => []
-            ], 200);
+            return response()->json(['message' => 'No se encontraron expedientes', 'expedientes' => []], 200);
         }
 
         return response()->json([
@@ -273,68 +252,33 @@ class ExpedienteController extends Controller
     }
 
     // ─── Listas para formulario ───────────────────────────────
-    public function areas()
+     public function areas()
     {
-        return response()->json(
-            Area::where('activo', 1)->orderBy('nombre')->get(['id', 'nombre']),
-            200
-        );
+        return response()->json(Area::where('activo', 1)->orderBy('nombre')->get(['id', 'nombre']), 200);
     }
 
     public function tiposDocumento()
     {
-        return response()->json(
-            TipoDocumento::orderBy('nombre')->get(['id', 'nombre']),
-            200
-        );
+        return response()->json(TipoDocumento::orderBy('nombre')->get(['id', 'nombre']), 200);
     }
 
-    // ─── Historial de ediciones ───────────────────────
+    // ─── Historial de ediciones ───────────────────────────────
     public function historial($id)
     {
         $expediente = Expediente::find($id);
 
         if (!$expediente) {
-            return response()->json([
-                'message' => 'Expediente no encontrado'
-            ], 404);
+            return response()->json(['message' => 'Expediente no encontrado'], 404);
         }
 
         $historialesEdiciones = HistorialEdicion::where('expediente_id', $id)
             ->with(['usuario'])
             ->orderBy('fecha_cambio', 'desc')
             ->get();
-
-        if ($historialesEdiciones->isEmpty()) {
-            return response()->json([
-                'message' => 'No hay cambios registrados para este expediente',
-                'historialesEdiciones' => [],
-            ], 200);
-        }
-
+            
         return response()->json([
             'historialesEdiciones' => $historialesEdiciones,
         ], 200);
     }
-
-    /**
-     * Devuelve expedientes agrupados por estado de alerta: VIGENTE, PROXIMO, ATRASADO
-     */
-    public function alertas()
-    {
-        $expedientes = Expediente::with(['areaActual', 'tipoDocumento'])->get();
-
-        $grupos = [
-            'VIGENTE' => [],
-            'PROXIMO' => [],
-            'ATRASADO' => [],
-        ];
-
-        foreach ($expedientes as $e) {
-            $estado = $e->obtenerEstadoAlerta();
-            $grupos[$estado][] = $this->formatExpediente($e);
-        }
-
-        return response()->json($grupos, 200);
-    }
 }
+

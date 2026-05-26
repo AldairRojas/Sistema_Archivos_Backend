@@ -7,17 +7,11 @@ use App\Http\Controllers\ArchivoDigitalController;
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\ReporteController;
 
-// ============================================
-// RUTAS PÚBLICAS (sin autenticación)
-// ============================================
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('/expedientes/{id}/archivos/{archivo_id}', [ArchivoDigitalController::class, 'descargar']);
 
-// ============================================
-// RUTAS PROTEGIDAS (con autenticación)
-// ============================================
 Route::middleware('auth:sanctum')->group(function () {
 
-    // ── Autenticación ──────────────────────────
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
@@ -27,19 +21,18 @@ Route::middleware('auth:sanctum')->group(function () {
     // ── Sprint 1 ───────────────────────────────
     Route::post('/expedientes', [ExpedienteController::class, 'store']);
     Route::get('/expedientes/buscar', [ExpedienteController::class, 'search']);
-    Route::get('/expedientes/alertas', [ExpedienteController::class, 'alertas']);
     Route::get('/expedientes', [ExpedienteController::class, 'index']);
     Route::get('/expedientes/{id}', [ExpedienteController::class, 'show']);
 
     // ── Sprint 2 ───────────────────────────────
     Route::put('/expedientes/{id}', [ExpedienteController::class, 'update']);
     Route::get('/expedientes/{id}/historial', [ExpedienteController::class, 'historial']);
-    Route::patch('/expedientes/{id}/estado', [ExpedienteController::class, 'cambiarEstado']);
-
+  
     // ── Sprint 3 ───────────────────────────────
     Route::post('/expedientes/{id}/archivos', [ArchivoDigitalController::class, 'subir']);
     Route::get('/expedientes/{id}/archivos', [ArchivoDigitalController::class, 'listar']);
-    Route::get('/expedientes/{id}/archivos/{archivo_id}', [ArchivoDigitalController::class, 'descargar']);
+    Route::delete('/expedientes/{id}/archivos/{archivo_id}', [ArchivoDigitalController::class, 'eliminar']);
+    
 
     // ── Sprint 4 — Áreas ───────────────────────
     Route::get('/areas', [AreaController::class, 'index']);

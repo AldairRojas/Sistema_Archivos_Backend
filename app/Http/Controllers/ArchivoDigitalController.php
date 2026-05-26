@@ -5,11 +5,12 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Expediente;
 use App\Models\ArchivoDigital;
+use App\Models\HistorialEdicion;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class ArchivoDigitalController extends Controller
 {
-    // HU08 - Subida de archivos PDF
     public function subir(Request $request, $id)
     {
         $request->validate([
@@ -19,37 +20,49 @@ class ArchivoDigitalController extends Controller
         $expediente = Expediente::findOrFail($id);
         $archivo = $request->file('archivo');
 
-        // Generar nombre único
-        $nombre_archivo = time() . '_' . str_replace(' ', '_', $archivo->getClientOriginalName());
+        $nombreLimpio = preg_replace('/[^a-zA-Z0-9._-]/', '_', $archivo->getClientOriginalName());
+        $nombre_archivo = time() . '_' . $nombreLimpio;
+
         $ruta = $archivo->storeAs('expedientes/' . $expediente->id, $nombre_archivo, 'public');
 
-        // Crear registro
         $archivoDigital = ArchivoDigital::create([
-        'expediente_id' => $expediente->id,
-        'usuario_id' => $request->user()->id,
-
-        'nombre_original' => $archivo->getClientOriginalName(),
-        'nombre_archivo' => $nombre_archivo,
-        'ruta_archivo' => $ruta,
-        'tipo_mime' => $archivo->getMimeType(),
-        'tamano_bytes' => $archivo->getSize(),
-        'uploaded_at' => now(),
+            'expediente_id'   => $expediente->id,
+            'usuario_id'      => $request->user()->id,
+            'nombre_original' => $archivo->getClientOriginalName(),
+            'nombre_archivo'  => $nombre_archivo,
+            'ruta_archivo'    => $ruta,
+            'tipo_mime'       => $archivo->getMimeType(),
+            'tamano_bytes'    => $archivo->getSize(),
+            'uploaded_at'     => now(),
         ]);
 
-        // HU09 - Actualizar estado de digitalización
         $expediente->update(['digitalizado' => true]);
 
+        // Registrar en historial
+        HistorialEdicion::create([
+            'expediente_id'    => $expediente->id,
+            'campo_modificado' => 'archivo_digital',
+            'valor_anterior'   => null,
+            'valor_nuevo'      => $archivo->getClientOriginalName(),
+            'usuario_id'       => $request->user()->id,
+            'fecha_cambio'     => Carbon::now('America/Lima'),
+            'observaciones'    => 'Archivo PDF adjuntado',
+        ]);
+
         return response()->json([
-            'message' => 'Archivo subido correctamente',
+            'message' => 'Archivo PDF adjuntado e indexado correctamente',
             'archivo' => $archivoDigital,
         ], 201);
     }
 
-    // HU10 - Listar archivos asociados
     public function listar($id)
     {
         $expediente = Expediente::findOrFail($id);
-        $archivos = $expediente->archivosDigitales;
+
+        $archivos = ArchivoDigital::with('usuario')
+            ->where('expediente_id', $expediente->id)
+            ->orderBy('uploaded_at', 'desc')
+            ->get();
 
         if ($archivos->isEmpty()) {
             return response()->json([
@@ -63,7 +76,6 @@ class ArchivoDigitalController extends Controller
         ], 200);
     }
 
-    // HU10 - Descargar archivo
     public function descargar($id, $archivo_id)
     {
         $expediente = Expediente::findOrFail($id);
@@ -72,20 +84,56 @@ class ArchivoDigitalController extends Controller
             ->where('expediente_id', $expediente->id)
             ->firstOrFail();
 
-        $rutaCompleta = storage_path(
-            'app/public/' . $archivo->ruta_archivo
-        );
+        $rutaCompleta = storage_path('app/public/' . $archivo->ruta_archivo);
 
         if (!file_exists($rutaCompleta)) {
-
             return response()->json([
-                'error' => 'Archivo no encontrado'
+                'error' => 'El archivo físico no se encuentra en el servidor'
             ], 404);
         }
 
-        return response()->download(
-            $rutaCompleta,
-            $archivo->nombre_original
-        );
+        return response()->file($rutaCompleta, [
+            'Content-Type'        => $archivo->tipo_mime,
+            'Content-Disposition' => 'attachment; filename="' . $archivo->nombre_original . '"',
+        ]);
+    }
+
+    public function eliminar(Request $request, $id, $archivo_id)
+    {
+        $expediente = Expediente::findOrFail($id);
+
+        $archivo = ArchivoDigital::where('id', $archivo_id)
+            ->where('expediente_id', $expediente->id)
+            ->firstOrFail();
+
+        // Eliminar archivo físico
+        $rutaCompleta = storage_path('app/public/' . $archivo->ruta_archivo);
+        if (file_exists($rutaCompleta)) {
+            unlink($rutaCompleta);
+        }
+
+        $nombreOriginal = $archivo->nombre_original;
+        $archivo->delete();
+
+        // Si no quedan más archivos, desmarcar digitalizado
+        $tieneArchivos = ArchivoDigital::where('expediente_id', $expediente->id)->exists();
+        if (!$tieneArchivos) {
+            $expediente->update(['digitalizado' => false]);
+        }
+
+        // Registrar en historial
+        HistorialEdicion::create([
+            'expediente_id'    => $expediente->id,
+            'campo_modificado' => 'archivo_digital',
+            'valor_anterior'   => $nombreOriginal,
+            'valor_nuevo'      => 'eliminado',
+            'usuario_id'       => $request->user()->id,
+            'fecha_cambio'     => Carbon::now('America/Lima'),
+            'observaciones'    => 'Archivo PDF eliminado',
+        ]);
+
+        return response()->json([
+            'message' => 'Archivo eliminado correctamente'
+        ], 200);
     }
 }

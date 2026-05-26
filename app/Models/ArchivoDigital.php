@@ -8,7 +8,7 @@ class ArchivoDigital extends Model
 {
     protected $table = 'archivos_digitales';
     
-    public $timestamps = false;
+    public $timestamps = false; 
 
     protected $fillable = [
         'usuario_id',
@@ -28,5 +28,10 @@ class ArchivoDigital extends Model
     public function expediente()
     {
         return $this->belongsTo(Expediente::class, 'expediente_id');
+    }
+
+    public function usuario()
+    {
+        return $this->belongsTo(User::class, 'usuario_id');
     }
 }
